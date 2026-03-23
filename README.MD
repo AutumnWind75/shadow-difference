@@ -2,12 +2,14 @@
 
 ## Problem Description
 
-Given two positive integers $n$ and $s$. Consider the set $(\mathbb Z^n_{\geq0})_s=\{x\in\mathbb Z^n_{\geq0}\colon\sum_ix_i=s\}$. For any element $x\in(\mathbb Z^n_{\geq0})_s$, define $\partial x\triangleq\{(x+e_i)\colon i\in[n]\}$. For any subset $X\subseteq(\mathbb Z^n_{\geq0})_s$, define $\partial X\triangleq\bigcup_{x\in X}\partial x$.
+Given two positive integers $n$ and $s$. Consider the set $(\mathbb Z^n_{\geq0})_{s}=\{x\in\mathbb Z^n_{\geq0}\colon\sum_{i}x_{i}=s\}$. For any element $x\in(\mathbb Z^n_{\geq0})_{s}$, define $\partial x\triangleq\{(x+e_{i})\colon i\in[n]\}$. For any subset $X\subseteq(\mathbb Z^n_{\geq0})_{s}$, define $\partial X\triangleq\bigcup_{x\in X}\partial x$.
 
 The problem is to divide $(\mathbb Z^n_{\geq0})_s$ into two disjoint sets $X\cup Y$, such that $\partial X\triangle\partial Y$ has the minimum number of elements.
 
 There is a lower bound
+
 $$\min\lvert\partial X\triangle\partial Y\rvert\geq n+n(n-1)s/6.$$
+
 Surprisingly, we have found that it fits very well when $n=5$ and $s\geq5$, and probably is the best lower bound.
 
 ## This Repository
