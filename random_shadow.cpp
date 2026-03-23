@@ -5,9 +5,9 @@ using namespace std;
 
 typedef vector<int> vi;
 
-int N, S, MAXCNT;
-
-bool operator<(const vi &a, const vi &b)  {
+bool operator<(const vi &a, const vi &b){
+    int N = a.size();
+    assert(N == b.size());
     for (int i = 0; i < N; ++i) {
         if (a[i] != b[i]) return a[i] < b[i];
     }
@@ -17,9 +17,6 @@ bool operator<(const vi &a, const vi &b)  {
 bool operator>(const vi &a, const vi &b)  {
     return b < a;
 }
-
-// vector<vi> X, Y;
-set<vi> X, Y;
 
 inline bool valid(const int &n, const int &s, const vi &a){
     int sum = 0;
@@ -62,7 +59,7 @@ void print(const int &n, const vi &vec){
     // puts("");
 }
 
-void init(){
+void init(const int &N, const int &S, set<vi> &X){
     vi vec0(N/2, 0), vec1(N - N/2, 0);
     for(int i = 0; i <= S; i += 2){
         vec0 = initial_state(N/2, i);
@@ -79,21 +76,18 @@ void init(){
     puts("INIT() COMPLETE!");
 }
 
-vi random_vector(){
-    if (N == 1) return {S};                     // 只有一种情况
+vi random_vector(const int &N, const int &S){
+    if (N == 1) return {S};
 
-    // 生成 0 .. S+N-2 的序列
     vi pool(S + N - 1);
     for (int i = 0; i < S + N - 1; ++i) pool[i] = i;
 
-    // 均匀选取 N-1 个不同的位置
     vi chosen(N - 1);
     random_device rd;
     mt19937 gen(rd());
     sample(pool.begin(), pool.end(), chosen.begin(), N - 1, gen);
     sort(chosen.begin(), chosen.end());
 
-    // 由间隔计算各分量
     vi vec(N);
     vec[0] = chosen[0];
     for (int i = 1; i < N - 1; ++i) {
@@ -115,7 +109,7 @@ vector<vi> upper(const int &n, const vi &vec){
     return ret;
 }
 
-int evaluate_diff(){
+int evaluate_diff(const int &N, const int &S, const set<vi> &X){
     int ret = 0;
     vi vec1 = initial_state(N, S + 1);
     do{
@@ -142,16 +136,15 @@ int evaluate_diff(){
     return ret;
 }
 
-int main(){
-    srand(time(NULL));
-    cin >> N >> S >> MAXCNT;
-    init();
-    int cnt = 0, best_diff = evaluate_diff();
+set<vi> max_diff(const int &N, const int &S, const int MAXCNT = 100000){
+    set<vi> X;
+    init(N, S, X);
+    int cnt = 0, best_diff = evaluate_diff(N, S, X);
     printf("Initial diff: %d\n", best_diff);
     set<vi> Xbest = X;
     // getchar();getchar();
     while(cnt < MAXCNT){
-        vi vec = random_vector();
+        vi vec = random_vector(N, S);
         auto it = X.find(vec);
         bool isinX = (it != X.end() && *it == vec);
         if(isinX){
@@ -159,11 +152,11 @@ int main(){
         }else{
             X.insert(vec);
         }
-        int cur_diff = evaluate_diff();
+        int cur_diff = evaluate_diff(N, S, X);
         if(cur_diff <= best_diff){
             if(cur_diff < best_diff){
                 best_diff = cur_diff;
-                printf("%d, ", best_diff);
+                printf("New best diff: %d\n", best_diff);
                 Xbest = X;
                 cnt = 0;
             }
@@ -181,9 +174,25 @@ int main(){
             // }
         }
     }
-    printf("\nN = %d, S = %d, MAXCNT = %d: [%d]\n", N, S, MAXCNT, best_diff);
-    for (const auto &vec : Xbest) {
-        print(N, vec);
+    printf("N = %d, S = %d, MAXCNT = %d: [%d]\n", N, S, MAXCNT, best_diff);
+    string filename = "results/" + to_string(N) + "_" + to_string(S) + "_" + to_string(best_diff) + ".txt";
+    ofstream out(filename);
+    for(const auto &vec : Xbest){
+        for(int i = 0; i < N; ++i){
+            out << vec[i] << " \n"[i == N - 1];
+        }
+    }
+    cout << "Output saved to " << filename << endl;
+    out.close();
+    return X;
+}
+
+int main(){
+    int N, S, MAXCNT;
+    while(true){
+        cin >> N >> S >> MAXCNT;
+        if(N == 0 || S == 0 || MAXCNT == 0) break;
+        max_diff(N, S, MAXCNT);
     }
     return 0;
 }
