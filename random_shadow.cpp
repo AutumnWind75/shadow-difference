@@ -237,6 +237,14 @@ set<vi> max_diff(const int &N, const int &S, const int MAXCNT = 100000){
         }else ++cnt;
     }
     printf("N = %d, S = %d, MAXCNT = %d: [%d]\n", N, S, MAXCNT, best_diff);
+    puts("Verifying...");
+    int tmp_diff = evaluate_diff(N, S, Xbest);
+    if(tmp_diff != best_diff){
+        cerr << "Verification failed! Expected: " << best_diff << ", Got: " << tmp_diff << "\n";
+        exit(1);
+    }else{
+        printf("Verification passed! Diff: %d\n", best_diff);
+    }
     string filename = "results/" + to_string(N) + "_" + to_string(S) + "_" + to_string(best_diff) + ".txt";
     ofstream out(filename);
     for(const auto &vec : Xbest){
@@ -250,15 +258,20 @@ set<vi> max_diff(const int &N, const int &S, const int MAXCNT = 100000){
 }
 
 int main(){
-    int N, S, MAXCNT;
+    int N, S, MAXCNT, EPOCHS;
     while(true){
-        cin >> N >> S >> MAXCNT;
-        if(N == 0 || S == 0 || MAXCNT == 0) break;
-        auto start = std::chrono::high_resolution_clock::now();
-        max_diff(N, S, MAXCNT);
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-        cout << "Time spent: " << duration.count() << " ms\n";
+        puts("Enter N, S, MAXCNT(*10000), EPOCHS (or enter 0 to exit):");
+        cin >> N;
+        if(N == 0) break;
+        cin >> S >> MAXCNT >> EPOCHS;
+        MAXCNT *= 10000;
+        while(EPOCHS--){
+            auto start = chrono::high_resolution_clock::now();
+            max_diff(N, S, MAXCNT);
+            auto end = chrono::high_resolution_clock::now();
+            auto duration = chrono::duration_cast<chrono::milliseconds>(end - start);
+            cout << "Time spent: " << duration.count() << " ms\n";
+        }
     }
     return 0;
 }
