@@ -14,7 +14,7 @@ bool operator<(const vi &a, const vi &b){
     return false;
 }
 
-bool operator>(const vi &a, const vi &b)  {
+bool operator>(const vi &a, const vi &b){
     return b < a;
 }
 
@@ -73,7 +73,7 @@ void init(const int &N, const int &S, set<vi> &X){
             }while(next_state(N - N/2, S - i, vec1));
         }while(next_state(N/2, i, vec0));
     }
-    puts("INIT() COMPLETE!");
+    // puts("INIT() COMPLETE!");
 }
 
 vi random_vector(const int &N, const int &S){
@@ -98,10 +98,11 @@ vi random_vector(const int &N, const int &S){
     return vec;
 }
 
+// Unused function.
 vector<vi> upper(const int &n, const vi &vec){
     vector<vi> ret;
     vi newVec = vec;
-    for (int i = 0; i < n; ++i) {
+    for(int i = 0; i < n; ++i){
         ++newVec[i];
         ret.push_back(newVec);
         --newVec[i];
@@ -109,7 +110,7 @@ vector<vi> upper(const int &n, const vi &vec){
     return ret;
 }
 
-int evaluate_diff(const int &N, const int &S, const set<vi> &X){
+int evaluate_diff(const int &N, const int &S, const set<vi> &X){ // Time complexity: O(N * C(S + N, N - 1))
     int ret = 0;
     vi vec1 = initial_state(N, S + 1);
     do{
@@ -118,7 +119,7 @@ int evaluate_diff(const int &N, const int &S, const set<vi> &X){
             if(vec1[i] == 0) continue;
             --vec1[i]; // Now vec1 is in (N, S).
             auto itX = X.find(vec1);
-            if(itX != X.end() && *itX == vec1){
+            if(itX != X.end()){
                 lowerinX = true;
                 if(lowerinY){++vec1[i];break;}
             }else{
@@ -136,43 +137,104 @@ int evaluate_diff(const int &N, const int &S, const set<vi> &X){
     return ret;
 }
 
+int update_diff(const int &N, const int &S, const set<vi> &X, vi vec){
+    auto it = X.find(vec);
+    bool isinX = (it != X.end() && *it == vec);
+    int ret = 0;
+    if(isinX){
+        // Assume we have removed vec from X.
+        for(int i = 0; i < N; ++i){
+            ++vec[i];
+            bool now_in_diff = true, old_in_diff = true;
+            // lowerinY = true. Need to check if lowerinX is true.
+            for(int j = 0; j < N; ++j){
+                if(vec[j] == 0 || j == i) continue;
+                --vec[j];
+                auto it2 = X.find(vec);
+                if(it2 != X.end() && *it2 == vec){ // vec is in X. lowerinX = true.
+                    now_in_diff = false;
+                    ++vec[j];
+                    break;
+                }
+                ++vec[j];
+            }
+            // Before removing vec, lowerinX = true. Need to check if lowerinY is true.
+            for(int j = 0; j < N; ++j){
+                if(vec[j] == 0 || j == i) continue;
+                --vec[j];
+                auto it2 = X.find(vec);
+                if(it2 == X.end()){ // vec is in Y. lowerinY = true.
+                    old_in_diff = false;
+                    ++vec[j];
+                    break;
+                }
+                ++vec[j];
+            }
+            if(now_in_diff) ++ret;
+            if(old_in_diff) --ret;
+            --vec[i];
+        }
+    }else{
+        // Assume we have added vec to X.
+        for(int i = 0; i < N; ++i){
+            ++vec[i];
+            bool now_in_diff = true, old_in_diff = true;
+            // lowerinX = true. Need to check if lowerinY is true.
+            for(int j = 0; j < N; ++j){
+                if(vec[j] == 0 || j == i) continue;
+                --vec[j];
+                auto it2 = X.find(vec);
+                if(it2 == X.end()){ // vec is in Y. lowerinY = true.
+                    now_in_diff = false;
+                    ++vec[j];
+                    break;
+                }
+                ++vec[j];
+            }
+            // Before adding vec, lowerinY = true. Need to check if lowerinX is true.
+            for(int j = 0; j < N; ++j){
+                if(vec[j] == 0 || j == i) continue;
+                --vec[j];
+                auto it2 = X.find(vec);
+                if(it2 != X.end()){ // vec is in X. lowerinX = true.
+                    old_in_diff = false;
+                    ++vec[j];
+                    break;
+                }
+                ++vec[j];
+            }
+            if(now_in_diff) ++ret;
+            if(old_in_diff) --ret;
+            --vec[i];
+        }
+    }
+    return ret;
+}
+
 set<vi> max_diff(const int &N, const int &S, const int MAXCNT = 100000){
     set<vi> X;
     init(N, S, X);
     int cnt = 0, best_diff = evaluate_diff(N, S, X);
     printf("Initial diff: %d\n", best_diff);
     set<vi> Xbest = X;
-    // getchar();getchar();
     while(cnt < MAXCNT){
         vi vec = random_vector(N, S);
-        auto it = X.find(vec);
-        bool isinX = (it != X.end() && *it == vec);
-        if(isinX){
-            X.erase(it);
-        }else{
-            X.insert(vec);
-        }
-        int cur_diff = evaluate_diff(N, S, X);
-        if(cur_diff <= best_diff){
-            if(cur_diff < best_diff){
-                best_diff = cur_diff;
+        int cur_diff = update_diff(N, S, X, vec);
+        if(cur_diff <= 0){
+            auto it = X.find(vec);
+            bool isinX = (it != X.end());
+            if(isinX){
+                X.erase(it);
+            }else{
+                X.insert(vec);
+            }
+            if(cur_diff < 0){
+                best_diff += cur_diff;
                 printf("New best diff: %d\n", best_diff);
                 Xbest = X;
                 cnt = 0;
             }
-        }else{
-            if(isinX){
-                X.insert(vec);
-            }else{
-                auto it2 = X.find(vec);
-                assert(it2 != X.end() && *it2 == vec);
-                X.erase(it2);
-            }
-            ++cnt;
-            // if(cnt % 100 == 0){
-            //     printf("Current diff: %d, cnt: %d\n", cur_diff, cnt);
-            // }
-        }
+        }else ++cnt;
     }
     printf("N = %d, S = %d, MAXCNT = %d: [%d]\n", N, S, MAXCNT, best_diff);
     string filename = "results/" + to_string(N) + "_" + to_string(S) + "_" + to_string(best_diff) + ".txt";
@@ -182,7 +244,7 @@ set<vi> max_diff(const int &N, const int &S, const int MAXCNT = 100000){
             out << vec[i] << " \n"[i == N - 1];
         }
     }
-    cout << "Output saved to " << filename << endl;
+    cout << "Output saved to " << filename << "\n===============================\n";
     out.close();
     return X;
 }
@@ -192,7 +254,11 @@ int main(){
     while(true){
         cin >> N >> S >> MAXCNT;
         if(N == 0 || S == 0 || MAXCNT == 0) break;
+        auto start = std::chrono::high_resolution_clock::now();
         max_diff(N, S, MAXCNT);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        cout << "Time spent: " << duration.count() << " ms\n";
     }
     return 0;
 }
