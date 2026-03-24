@@ -137,76 +137,39 @@ int evaluate_diff(const int &N, const int &S, const set<vi> &X){ // Time complex
     return ret;
 }
 
-int update_diff(const int &N, const int &S, const set<vi> &X, vi vec){
+int update_diff(const int &N, const int &S, const set<vi> &X, vi vec){ // Time complexity: O(N^2)
     auto it = X.find(vec);
     bool isinX = (it != X.end() && *it == vec);
     int ret = 0;
-    if(isinX){
-        // Assume we have removed vec from X.
-        for(int i = 0; i < N; ++i){
-            ++vec[i];
-            bool now_in_diff = true, old_in_diff = true;
-            // lowerinY = true. Need to check if lowerinX is true.
-            for(int j = 0; j < N; ++j){
-                if(vec[j] == 0 || j == i) continue;
-                --vec[j];
-                auto it2 = X.find(vec);
-                if(it2 != X.end() && *it2 == vec){ // vec is in X. lowerinX = true.
-                    now_in_diff = false;
-                    ++vec[j];
-                    break;
+    for(int i = 0; i < N; ++i){
+        ++vec[i];
+        bool flag1 = true, flag2 = true;
+        for(int j = 0; j < N; ++j){
+            if(vec[j] == 0 || j == i) continue;
+            --vec[j];
+            auto it2 = X.find(vec);
+            if(it2 != X.end()){ // This code is indeed correct. Just verify by yourself.
+                if(flag1){
+                    flag1 = false;
+                    ret += isinX ? -1 : 1;
+                    if(!flag2){
+                        ++vec[j];
+                        break;
+                    }
                 }
-                ++vec[j];
-            }
-            // Before removing vec, lowerinX = true. Need to check if lowerinY is true.
-            for(int j = 0; j < N; ++j){
-                if(vec[j] == 0 || j == i) continue;
-                --vec[j];
-                auto it2 = X.find(vec);
-                if(it2 == X.end()){ // vec is in Y. lowerinY = true.
-                    old_in_diff = false;
-                    ++vec[j];
-                    break;
+            }else{
+                if(flag2){
+                    flag2 = false;
+                    ret += isinX ? 1 : -1;
+                    if(!flag1){
+                        ++vec[j];
+                        break;
+                    }
                 }
-                ++vec[j];
             }
-            if(now_in_diff) ++ret;
-            if(old_in_diff) --ret;
-            --vec[i];
+            ++vec[j];
         }
-    }else{
-        // Assume we have added vec to X.
-        for(int i = 0; i < N; ++i){
-            ++vec[i];
-            bool now_in_diff = true, old_in_diff = true;
-            // lowerinX = true. Need to check if lowerinY is true.
-            for(int j = 0; j < N; ++j){
-                if(vec[j] == 0 || j == i) continue;
-                --vec[j];
-                auto it2 = X.find(vec);
-                if(it2 == X.end()){ // vec is in Y. lowerinY = true.
-                    now_in_diff = false;
-                    ++vec[j];
-                    break;
-                }
-                ++vec[j];
-            }
-            // Before adding vec, lowerinY = true. Need to check if lowerinX is true.
-            for(int j = 0; j < N; ++j){
-                if(vec[j] == 0 || j == i) continue;
-                --vec[j];
-                auto it2 = X.find(vec);
-                if(it2 != X.end()){ // vec is in X. lowerinX = true.
-                    old_in_diff = false;
-                    ++vec[j];
-                    break;
-                }
-                ++vec[j];
-            }
-            if(now_in_diff) ++ret;
-            if(old_in_diff) --ret;
-            --vec[i];
-        }
+        --vec[i];
     }
     return ret;
 }
