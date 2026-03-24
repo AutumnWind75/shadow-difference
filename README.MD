@@ -29,3 +29,4 @@ We use `C++` to give constructions to $X$ (given in `results` folder). Current r
 | $5$ | $12$ | $45$ | $45$ |
 | $5$ | $13$ | $49$ | $48.33$ |
 | $5$ | $14$ | $52$ | $51.67$ |
+| $5$ | $15$ | $55$ | $55$ |
