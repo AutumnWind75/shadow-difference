@@ -12,7 +12,7 @@ $$\min\lvert\partial X\triangle\partial Y\rvert\geq n+n(n-1)s/6.$$
 
 Surprisingly, we have found that it fits very well when $n=5$ and $s\geq5$, and probably is the best lower bound.
 
-## This Repository
+## What This Repository Does
 
 We use `C++` to give constructions to $X$ (given in `results` folder). Current results are:
 
@@ -30,3 +30,8 @@ We use `C++` to give constructions to $X$ (given in `results` folder). Current r
 | $5$ | $13$ | $49$ | $48.33$ |
 | $5$ | $14$ | $52$ | $51.67$ |
 | $5$ | $15$ | $55$ | $55$ |
+
+## References
+
+J. Brooks and K. Palencia, *A rank question for homogeneous polynomials*, Proc. Amer. Math. Soc. **149** (2021), 3627–3637. 
+DOI: [10.1090/proc/15456](https://doi.org/10.1090/proc/15456)
