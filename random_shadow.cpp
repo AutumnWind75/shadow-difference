@@ -5,19 +5,6 @@ using namespace std;
 
 typedef vector<int> vi;
 
-bool operator<(const vi &a, const vi &b){
-    int N = a.size();
-    assert(N == b.size());
-    for (int i = 0; i < N; ++i) {
-        if (a[i] != b[i]) return a[i] < b[i];
-    }
-    return false;
-}
-
-bool operator>(const vi &a, const vi &b){
-    return b < a;
-}
-
 inline bool valid(const int &n, const int &s, const vi &a){
     int sum = 0;
     for(int i : a) sum += i;
@@ -105,18 +92,6 @@ vi random_vector(const int &N, const int &S){
     vec[N - 1] = (S + N - 2) - chosen.back();
 
     return vec;
-}
-
-// Unused function.
-vector<vi> upper(const int &n, const vi &vec){
-    vector<vi> ret;
-    vi newVec = vec;
-    for(int i = 0; i < n; ++i){
-        ++newVec[i];
-        ret.push_back(newVec);
-        --newVec[i];
-    }
-    return ret;
 }
 
 int evaluate_diff(const int &N, const int &S, const set<vi> &X){ // Time complexity: O(N * C(S + N, N - 1))
