@@ -60,6 +60,7 @@ void print(const int &n, const vi &vec){
 }
 
 void init(const int &N, const int &S, set<vi> &X){
+    X.clear();
     vi vec0(N/2, 0), vec1(N - N/2, 0);
     for(int i = 0; i <= S; i += 2){
         vec0 = initial_state(N/2, i);
@@ -74,6 +75,14 @@ void init(const int &N, const int &S, set<vi> &X){
         }while(next_state(N/2, i, vec0));
     }
     // puts("INIT() COMPLETE!");
+
+    //////////////////////////////////////////////////////////
+
+    // vi vec0 = initial_state(N, S);
+    // do{
+    //     if(rand() % 2)
+    //         X.insert(vec0);
+    // }while(next_state(N, S, vec0));
 }
 
 vi random_vector(const int &N, const int &S){
@@ -221,6 +230,7 @@ set<vi> max_diff(const int &N, const int &S, const int MAXCNT = 100000){
 }
 
 int main(){
+    srand(time(0));
     int N, S, MAXCNT, EPOCHS;
     while(true){
         puts("Enter N, S, MAXCNT(*10000), EPOCHS (or enter 0 to exit):");
