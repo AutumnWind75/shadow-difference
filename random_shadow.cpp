@@ -79,8 +79,14 @@ vi random_vector(const int &N, const int &S){
     for (int i = 0; i < S + N - 1; ++i) pool[i] = i;
 
     vi chosen(N - 1);
-    random_device rd;
-    mt19937 gen(rd());
+    static thread_local mt19937 gen([]() {
+        random_device rd;
+        const auto now = static_cast<unsigned int>(
+            chrono::high_resolution_clock::now().time_since_epoch().count()
+        );
+        const auto tid = static_cast<unsigned int>(hash<thread::id>{}(this_thread::get_id()));
+        return mt19937(rd() ^ now ^ tid);
+    }());
     sample(pool.begin(), pool.end(), chosen.begin(), N - 1, gen);
     sort(chosen.begin(), chosen.end());
 
@@ -158,15 +164,56 @@ int update_diff(const int &N, const int &S, const set<vi> &X, vi vec){ // Time c
     return ret;
 }
 
+pair<int, vi> best_candidate_parallel(const int &N, const int &S, const set<vi> &X, const int batch_size, unsigned int thread_count){
+    thread_count = max(1u, thread_count);
+    const int actual_batch_size = max(batch_size, static_cast<int>(thread_count));
+    const int chunk_size = (actual_batch_size + static_cast<int>(thread_count) - 1) / static_cast<int>(thread_count);
+
+    vector<future<pair<int, vi>>> tasks;
+    tasks.reserve(thread_count);
+    for(unsigned int t = 0; t < thread_count; ++t){
+        const int start = static_cast<int>(t) * chunk_size;
+        const int end = min(start + chunk_size, actual_batch_size);
+        if(start >= end) break;
+
+        tasks.push_back(async(launch::async, [&, start, end]() -> pair<int, vi> {
+            int best_diff = numeric_limits<int>::max();
+            vi best_vec;
+            for(int i = start; i < end; ++i){
+                vi vec = random_vector(N, S);
+                int cur_diff = update_diff(N, S, X, vec);
+                if(cur_diff < best_diff){
+                    best_diff = cur_diff;
+                    best_vec = move(vec);
+                }
+            }
+            return {best_diff, best_vec};
+        }));
+    }
+
+    int global_best_diff = numeric_limits<int>::max();
+    vi global_best_vec;
+    for(auto &task : tasks){
+        auto [local_best_diff, local_best_vec] = task.get();
+        if(local_best_diff < global_best_diff){
+            global_best_diff = local_best_diff;
+            global_best_vec = move(local_best_vec);
+        }
+    }
+    return {global_best_diff, global_best_vec};
+}
+
 set<vi> max_diff(const int &N, const int &S, const int MAXCNT = 100000){
     set<vi> X;
     init(N, S, X);
     int cnt = 0, best_diff = evaluate_diff(N, S, X);
+    const unsigned int thread_count = max(1u, thread::hardware_concurrency());
+    const int batch_size = static_cast<int>(thread_count) * 4;
     printf("Initial diff: %d\n", best_diff);
+    printf("Using %u threads, batch size %d\n", thread_count, batch_size);
     set<vi> Xbest = X;
     while(cnt < MAXCNT){
-        vi vec = random_vector(N, S);
-        int cur_diff = update_diff(N, S, X, vec);
+        auto [cur_diff, vec] = best_candidate_parallel(N, S, X, batch_size, thread_count);
         if(cur_diff <= 0){
             auto it = X.find(vec);
             bool isinX = (it != X.end());
@@ -180,8 +227,8 @@ set<vi> max_diff(const int &N, const int &S, const int MAXCNT = 100000){
                 printf("New best diff: %d\n", best_diff);
                 Xbest = X;
                 cnt = 0;
-            }
-        }else ++cnt;
+            }else cnt += batch_size / 10;
+        }else cnt += batch_size;
     }
     printf("N = %d, S = %d, MAXCNT = %d: [%d]\n", N, S, MAXCNT, best_diff);
     puts("Verifying...");
