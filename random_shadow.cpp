@@ -5,6 +5,17 @@ using namespace std;
 
 typedef vector<int> vi;
 
+struct SearchResult {
+    int best_diff;
+    set<vi> Xbest;
+};
+
+struct SharedBest {
+    atomic<int> best_diff{INT_MAX};
+    mutex data_mutex;
+    set<vi> Xbest;
+};
+
 inline bool valid(const int &n, const int &s, const vi &a){
     int sum = 0;
     for(int i : a) sum += i;
@@ -79,14 +90,7 @@ vi random_vector(const int &N, const int &S){
     for (int i = 0; i < S + N - 1; ++i) pool[i] = i;
 
     vi chosen(N - 1);
-    static thread_local mt19937 gen([]() {
-        random_device rd;
-        const auto now = static_cast<unsigned int>(
-            chrono::high_resolution_clock::now().time_since_epoch().count()
-        );
-        const auto tid = static_cast<unsigned int>(hash<thread::id>{}(this_thread::get_id()));
-        return mt19937(rd() ^ now ^ tid);
-    }());
+    thread_local mt19937 gen(random_device{}());
     sample(pool.begin(), pool.end(), chosen.begin(), N - 1, gen);
     sort(chosen.begin(), chosen.end());
 
@@ -164,56 +168,14 @@ int update_diff(const int &N, const int &S, const set<vi> &X, vi vec){ // Time c
     return ret;
 }
 
-pair<int, vi> best_candidate_parallel(const int &N, const int &S, const set<vi> &X, const int batch_size, unsigned int thread_count){
-    thread_count = max(1u, thread_count);
-    const int actual_batch_size = max(batch_size, static_cast<int>(thread_count));
-    const int chunk_size = (actual_batch_size + static_cast<int>(thread_count) - 1) / static_cast<int>(thread_count);
-
-    vector<future<pair<int, vi>>> tasks;
-    tasks.reserve(thread_count);
-    for(unsigned int t = 0; t < thread_count; ++t){
-        const int start = static_cast<int>(t) * chunk_size;
-        const int end = min(start + chunk_size, actual_batch_size);
-        if(start >= end) break;
-
-        tasks.push_back(async(launch::async, [&, start, end]() -> pair<int, vi> {
-            int best_diff = numeric_limits<int>::max();
-            vi best_vec;
-            for(int i = start; i < end; ++i){
-                vi vec = random_vector(N, S);
-                int cur_diff = update_diff(N, S, X, vec);
-                if(cur_diff < best_diff){
-                    best_diff = cur_diff;
-                    best_vec = move(vec);
-                }
-            }
-            return {best_diff, best_vec};
-        }));
-    }
-
-    int global_best_diff = numeric_limits<int>::max();
-    vi global_best_vec;
-    for(auto &task : tasks){
-        auto [local_best_diff, local_best_vec] = task.get();
-        if(local_best_diff < global_best_diff){
-            global_best_diff = local_best_diff;
-            global_best_vec = move(local_best_vec);
-        }
-    }
-    return {global_best_diff, global_best_vec};
-}
-
-set<vi> max_diff(const int &N, const int &S, const int MAXCNT = 100000){
+SearchResult max_diff(const int &N, const int &S, const int MAXCNT = 100000){
     set<vi> X;
     init(N, S, X);
     int cnt = 0, best_diff = evaluate_diff(N, S, X);
-    const unsigned int thread_count = max(1u, thread::hardware_concurrency());
-    const int batch_size = static_cast<int>(thread_count) * 4;
-    printf("Initial diff: %d\n", best_diff);
-    printf("Using %u threads, batch size %d\n", thread_count, batch_size);
     set<vi> Xbest = X;
     while(cnt < MAXCNT){
-        auto [cur_diff, vec] = best_candidate_parallel(N, S, X, batch_size, thread_count);
+        vi vec = random_vector(N, S);
+        int cur_diff = update_diff(N, S, X, vec);
         if(cur_diff <= 0){
             auto it = X.find(vec);
             bool isinX = (it != X.end());
@@ -224,21 +186,21 @@ set<vi> max_diff(const int &N, const int &S, const int MAXCNT = 100000){
             }
             if(cur_diff < 0){
                 best_diff += cur_diff;
-                printf("New best diff: %d\n", best_diff);
                 Xbest = X;
                 cnt = 0;
-            }else cnt += batch_size / 10;
-        }else cnt += batch_size;
+            }
+        }else ++cnt;
     }
-    printf("N = %d, S = %d, MAXCNT = %d: [%d]\n", N, S, MAXCNT, best_diff);
-    puts("Verifying...");
+
     int tmp_diff = evaluate_diff(N, S, Xbest);
     if(tmp_diff != best_diff){
-        cerr << "Verification failed! Expected: " << best_diff << ", Got: " << tmp_diff << "\n";
-        exit(1);
-    }else{
-        printf("Verification passed! Diff: %d\n", best_diff);
+        throw runtime_error("Verification failed in max_diff");
     }
+
+    return {best_diff, Xbest};
+}
+
+void save_result(const int &N, const int &S, const int best_diff, const set<vi> &Xbest){
     string filename = "results/" + to_string(N) + "_" + to_string(S) + "_" + to_string(best_diff) + ".txt";
     ofstream out(filename);
     for(const auto &vec : Xbest){
@@ -246,26 +208,56 @@ set<vi> max_diff(const int &N, const int &S, const int MAXCNT = 100000){
             out << vec[i] << " \n"[i == N - 1];
         }
     }
-    cout << "Output saved to " << filename << "\n===============================\n";
     out.close();
-    return X;
+}
+
+void update_global_best(const SearchResult &result, SharedBest &shared){
+    int current_best = shared.best_diff.load(memory_order_relaxed);
+    while(result.best_diff < current_best){
+        if(shared.best_diff.compare_exchange_weak(current_best, result.best_diff,
+            memory_order_acq_rel, memory_order_relaxed)){
+            {
+                lock_guard<mutex> guard(shared.data_mutex);
+                shared.Xbest = result.Xbest;
+            }
+            cout << "Best diff: " << result.best_diff << "\n";
+            return;
+        }
+    }
 }
 
 int main(){
-    srand(time(0));
-    int N, S, MAXCNT, EPOCHS;
+    int N, S, MAXCNT, THREADS;
     while(true){
-        puts("Enter N, S, MAXCNT(*10000), EPOCHS (or enter 0 to exit):");
+        puts("Enter N, S, MAXCNT(*10000), THREADS (or enter 0 to exit):");
         cin >> N;
         if(N == 0) break;
-        cin >> S >> MAXCNT >> EPOCHS;
+        cin >> S >> MAXCNT >> THREADS;
         MAXCNT *= 10000;
-        while(EPOCHS--){
-            auto start = chrono::high_resolution_clock::now();
-            max_diff(N, S, MAXCNT);
-            auto end = chrono::high_resolution_clock::now();
-            auto duration = chrono::duration_cast<chrono::milliseconds>(end - start);
-            cout << "Time spent: " << duration.count() << " ms\n";
+
+        SharedBest shared;
+        vector<thread> workers;
+        workers.reserve(THREADS);
+
+        for(int i = 0; i < THREADS; ++i){
+            workers.emplace_back([&]() {
+                SearchResult local = max_diff(N, S, MAXCNT);
+                update_global_best(local, shared);
+            });
+        }
+
+        for(auto &worker : workers){
+            worker.join();
+        }
+
+        int final_best = shared.best_diff.load(memory_order_relaxed);
+        if(final_best != INT_MAX){
+            set<vi> best_snapshot;
+            {
+                lock_guard<mutex> guard(shared.data_mutex);
+                best_snapshot = shared.Xbest;
+            }
+            save_result(N, S, final_best, best_snapshot);
         }
     }
     return 0;
