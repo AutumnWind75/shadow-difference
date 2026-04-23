@@ -12,6 +12,7 @@ struct SearchResult {
 
 struct SharedBest {
     atomic<int> best_diff{INT_MAX};
+    double print_threshold = numeric_limits<double>::infinity();
     mutex data_mutex;
     set<vi> Xbest;
 };
@@ -168,11 +169,28 @@ int update_diff(const int &N, const int &S, const set<vi> &X, vi vec){ // Time c
     return ret;
 }
 
-SearchResult max_diff(const int &N, const int &S, const int MAXCNT = 100000){
+void try_update_global_best(const int candidate_diff, const set<vi> &candidate_best, SharedBest &shared){
+    int current_best = shared.best_diff.load(memory_order_relaxed);
+    if(candidate_diff >= current_best) return;
+
+    lock_guard<mutex> guard(shared.data_mutex);
+    current_best = shared.best_diff.load(memory_order_relaxed);
+    if(candidate_diff >= current_best) return;
+
+    shared.best_diff.store(candidate_diff, memory_order_relaxed);
+    shared.Xbest = candidate_best;
+    if(candidate_diff < shared.print_threshold){
+        cout << "Best diff: " << candidate_diff << "\n";
+    }
+}
+
+SearchResult max_diff(const int &N, const int &S, const int MAXCNT = 100000, SharedBest *shared = nullptr){
     set<vi> X;
     init(N, S, X);
     int cnt = 0, best_diff = evaluate_diff(N, S, X);
     set<vi> Xbest = X;
+    if(shared) try_update_global_best(best_diff, Xbest, *shared);
+
     while(cnt < MAXCNT){
         vi vec = random_vector(N, S);
         int cur_diff = update_diff(N, S, X, vec);
@@ -187,6 +205,7 @@ SearchResult max_diff(const int &N, const int &S, const int MAXCNT = 100000){
             if(cur_diff < 0){
                 best_diff += cur_diff;
                 Xbest = X;
+                if(shared) try_update_global_best(best_diff, Xbest, *shared);
                 cnt = 0;
             }
         }else ++cnt;
@@ -211,38 +230,34 @@ void save_result(const int &N, const int &S, const int best_diff, const set<vi> 
     out.close();
 }
 
-void update_global_best(const SearchResult &result, SharedBest &shared){
-    int current_best = shared.best_diff.load(memory_order_relaxed);
-    while(result.best_diff < current_best){
-        if(shared.best_diff.compare_exchange_weak(current_best, result.best_diff,
-            memory_order_acq_rel, memory_order_relaxed)){
-            {
-                lock_guard<mutex> guard(shared.data_mutex);
-                shared.Xbest = result.Xbest;
-            }
-            cout << "Best diff: " << result.best_diff << "\n";
-            return;
-        }
-    }
-}
-
 int main(){
     int N, S, MAXCNT, THREADS;
+    unsigned int max_threads = thread::hardware_concurrency();
+    if(max_threads == 0){
+        puts("Maximum concurrent threads available: unknown (hardware_concurrency returned 0)");
+    }else{
+        printf("Maximum concurrent threads available: %u\n", max_threads);
+    }
+
     while(true){
         puts("Enter N, S, MAXCNT(*10000), THREADS (or enter 0 to exit):");
         cin >> N;
         if(N == 0) break;
         cin >> S >> MAXCNT >> THREADS;
+        if(max_threads != 0 && THREADS > (int)max_threads){
+            printf("Warning: requested THREADS = %d exceeds suggested max = %u\n", THREADS, max_threads);
+        }
         MAXCNT *= 10000;
 
         SharedBest shared;
+        double lower_bound = N + (double)N * (N - 1) * S / 6.0;
+        shared.print_threshold = 1.2 * lower_bound;
         vector<thread> workers;
         workers.reserve(THREADS);
 
         for(int i = 0; i < THREADS; ++i){
             workers.emplace_back([&]() {
-                SearchResult local = max_diff(N, S, MAXCNT);
-                update_global_best(local, shared);
+                max_diff(N, S, MAXCNT, &shared);
             });
         }
 
