@@ -8,6 +8,8 @@ typedef vector<int> vi;
 struct SharedBest {
     int best_diff = INT_MAX;
     double print_threshold = numeric_limits<double>::infinity();
+    int theoretical_lower_bound = 0;
+    bool reached_theoretical_lower_bound = false;
     set<vi> Xbest;
     int best_owner = -1;
     int owner_stall = 0;
@@ -181,29 +183,13 @@ int update_diff(const int &N, const int &S, const set<vi> &X, vi vec){ // Time c
 void trigger_assist_locked(SharedBest &shared, const int THREADS){
     if(shared.assist_in_progress || shared.best_owner < 0) return;
 
-    int need = max(1, THREADS / 2);
     vector<int> selected;
     selected.reserve(THREADS - 1);
 
     for(int i = 0; i < THREADS; ++i){
         if(i == shared.best_owner) continue;
-        if(shared.worker_finished[i]) selected.push_back(i);
-    }
-
-    if((int)selected.size() < need){
-        vector<pair<int, int>> active;
-        active.reserve(THREADS);
-        for(int i = 0; i < THREADS; ++i){
-            if(i == shared.best_owner) continue;
-            if(shared.worker_finished[i]) continue;
-            active.push_back({shared.worker_best_diff[i], i});
-        }
-        sort(active.begin(), active.end(), [](const pair<int, int> &a, const pair<int, int> &b){
-            return a.first > b.first;
-        });
-        for(auto &it : active){
-            if((int)selected.size() >= need) break;
-            selected.push_back(it.second);
+        if(shared.worker_best_diff[i] > shared.best_diff){
+            selected.push_back(i);
         }
     }
 
@@ -216,6 +202,13 @@ void trigger_assist_locked(SharedBest &shared, const int THREADS){
         shared.worker_restart_token[id] = token;
         shared.worker_finished[id] = false;
     }
+
+    cout << "Assist triggered: owner thread " << shared.best_owner
+         << " stalled; reassigning " << selected.size() << " thread(s):";
+    for(int id : selected){
+        cout << ' ' << id;
+    }
+    cout << " (best diff=" << shared.best_diff << ")\n";
 
     shared.assist_in_progress = true;
     shared.owner_stall = 0;
@@ -234,6 +227,15 @@ bool try_update_global_best(const int thread_id, const int candidate_diff,
     shared.assist_in_progress = false;
     if(candidate_diff < shared.print_threshold){
         cout << "Best diff: " << candidate_diff << "\n";
+    }
+
+    if(!shared.reached_theoretical_lower_bound &&
+       shared.best_diff <= shared.theoretical_lower_bound){
+        shared.reached_theoretical_lower_bound = true;
+        shared.shutdown = true;
+        cout << "Reached theoretical lower bound (" << shared.theoretical_lower_bound
+             << "). Stopping early.\n";
+        shared.cv.notify_all();
     }
     return true;
 }
@@ -358,6 +360,7 @@ int main(){
 
         SharedBest shared;
         double lower_bound = N + (double)N * (N - 1) * S / 6.0;
+        shared.theoretical_lower_bound = (int)ceil(lower_bound);
         shared.print_threshold = 1.3 * lower_bound;
         shared.worker_best_diff.assign(THREADS, INT_MAX);
         shared.worker_finished.assign(THREADS, false);
@@ -375,6 +378,7 @@ int main(){
         {
             unique_lock<mutex> lock(shared.data_mutex);
             shared.cv.wait(lock, [&](){
+                if(shared.shutdown) return true;
                 for(bool done : shared.worker_finished){
                     if(!done) return false;
                 }
