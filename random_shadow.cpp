@@ -337,6 +337,33 @@ void save_result(const int &N, const int &S, const int best_diff, const set<vi> 
     out.close();
 }
 
+void periodic_save_best(const int &N, const int &S, SharedBest &shared){
+    const auto interval = chrono::minutes(30);
+    while(true){
+        int best_snapshot_diff = INT_MAX;
+        set<vi> best_snapshot_X;
+        bool should_stop = false;
+        {
+            unique_lock<mutex> lock(shared.data_mutex);
+            shared.cv.wait_for(lock, interval, [&](){
+                return shared.shutdown;
+            });
+            best_snapshot_diff = shared.best_diff;
+            if(best_snapshot_diff != INT_MAX){
+                best_snapshot_X = shared.Xbest;
+            }
+            should_stop = shared.shutdown;
+        }
+
+        if(best_snapshot_diff != INT_MAX){
+            save_result(N, S, best_snapshot_diff, best_snapshot_X);
+            cout << "Periodic save: best diff " << best_snapshot_diff << "\n";
+        }
+
+        if(should_stop) break;
+    }
+}
+
 int main(){
     int N, S, MAXCNT, THREADS;
     unsigned int max_threads = thread::hardware_concurrency();
@@ -375,6 +402,10 @@ int main(){
             });
         }
 
+        thread saver([&](){
+            periodic_save_best(N, S, shared);
+        });
+
         {
             unique_lock<mutex> lock(shared.data_mutex);
             shared.cv.wait(lock, [&](){
@@ -391,6 +422,8 @@ int main(){
         for(auto &worker : workers){
             worker.join();
         }
+
+        saver.join();
 
         int final_best;
         set<vi> best_snapshot;
