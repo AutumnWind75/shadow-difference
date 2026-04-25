@@ -15,7 +15,7 @@ all: $(TARGET1) $(TARGET2)
 
 $(TARGET1): random_shadow.cpp
 	$(CXX) $(CXXFLAGS) -pthread -o $@ $<
-$(TARGET2): shadow_mod.cpp
+$(TARGET2): shadow_verify_mod.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
 clean:

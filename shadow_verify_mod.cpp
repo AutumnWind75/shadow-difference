@@ -146,7 +146,7 @@ int main(){
     srand(time(0));
     int N, S;
     set<vi> X;
-    while(true){
+    // while(true){
         // puts("Enter N, S, MOD(or enter 0 to exit):");
         // cin >> N;
         // if(N == 0) break;
@@ -154,11 +154,14 @@ int main(){
         // if(MOD <= 0){
         //     puts("Assuming that you are not using MOD...");
         // }
-        N = 6; MOD = 6;
-        cin >> S;
-        if(S % 6 != 0) break;
+        // N = 6; MOD = 6;
+        // cin >> S;
+        // if(S % 6 != 0) break;
+        // cin >> N >> S;
+        N = 8, S = 9;
+        MOD = 0;
         printf("N = %d, S = %d, MOD = %d\n", N, S, MOD);
-        ifstream infile("mod6n6.csv");
+        ifstream infile("n8_s9_92.txt");
         if (!infile.is_open()) {
             cerr << "Failed to open file." << endl;
             return 1;
@@ -166,26 +169,27 @@ int main(){
         X.clear();
 
         string line;
-        // 跳过表头
-        getline(infile, line);
+        // // 跳过表头
+        // getline(infile, line);
         while (getline(infile, line)) {
             stringstream ss(line);
             vector<int> vec;
             int val;
-            // 读取前6列
-            for (int i = 0; i < 6; ++i) {
+            // 读取前N列
+            for (int i = 0; i < N; ++i) {
                 if (ss >> val) {
                     vec.push_back(val);
-                    if (ss.peek() == ',') ss.ignore();
+                    // if (ss.peek() == ',') ss.ignore();
                 } else {
                     break; // 格式错误，跳过该行
                 }
             }
-            // 读取第7列（0或1）
-            int flag;
-            if (ss >> flag && flag == 1) {
-                X.insert(vec);
-            }
+            // // 读取第N+1列（0或1）
+            // int flag;
+            // if (ss >> flag && flag == 1) {
+            //     X.insert(vec);
+            // }
+            X.insert(vec);
         }
 
         auto start = chrono::high_resolution_clock::now();
@@ -195,6 +199,6 @@ int main(){
         auto end = chrono::high_resolution_clock::now();
         auto duration = chrono::duration_cast<chrono::milliseconds>(end - start);
         cout << "Time spent: " << duration.count() << " ms\n";
-    }
+    // }
     return 0;
 }
